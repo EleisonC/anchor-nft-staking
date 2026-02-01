@@ -40,6 +40,7 @@ pub struct Unstake<'info> {
     )]
     pub config: Account<'info, StakeConfig>,
     #[account(
+        mut,
         seeds = [b"user".as_ref(), user.key().as_ref()],
         bump = user_account.bump
     )]
@@ -53,13 +54,16 @@ pub struct Unstake<'info> {
 impl<'info> Unstake<'info> {
     pub fn unstake(&mut self) -> Result<()> {
         let time_elapsed =
-            (Clock::get()?.unix_timestamp - self.stake_account.staked_at / 86400) as u32;
+            ((Clock::get()?.unix_timestamp - self.stake_account.staked_at) / 86400) as u32;
+
         require!(
             time_elapsed > self.config.freeze_period,
             StakeError::FreezePeriodNotPassed
         );
 
-        let points_earned = time_elapsed * self.config.points_per_stake as u32;
+        let points_earned = time_elapsed
+            .checked_mul(self.config.points_per_stake as u32)
+            .ok_or(StakeError::OverflowError)?;
 
         self.user_account.points += points_earned;
 
