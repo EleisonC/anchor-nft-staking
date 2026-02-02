@@ -31,11 +31,10 @@ pub struct Claim<'info> {
     pub user_account: Account<'info, UserAccount>,
     #[account(
         seeds = [b"rewards".as_ref(), config.key().as_ref()],
-        bump,
+        bump = config.rewards_bump,
         mint::authority = config,
     )]
     pub reward_mint: Account<'info, Mint>,
-
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -44,7 +43,8 @@ pub struct Claim<'info> {
 impl<'info> Claim<'info> {
     pub fn claim(&mut self) -> Result<()> {
         //TODO
-        let points = self.user_account.points;
+        let points = (self.user_account.points as u64)
+            .saturating_mul(10u64.pow(self.reward_mint.decimals as u32));
 
         // Mint reward tokens equal to points
         let signer_seeds: &[&[&[u8]]] = &[&[b"config".as_ref(), &[self.config.bump]]];
@@ -59,7 +59,7 @@ impl<'info> Claim<'info> {
                 },
                 &signer_seeds,
             ),
-            points as u64,
+            points,
         )?;
 
         // Reset points
